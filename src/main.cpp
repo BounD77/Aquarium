@@ -1,3 +1,6 @@
+
+using namespace std;
+
 /*
  An example analogue clock using a TFT LCD screen to show the time
  use of some of the drawing commands with the modified Adafruit_TFT_AS library.
@@ -42,7 +45,7 @@
 #include <Wire.h>        // I2C
 #include <TFT_ILI9341.h> // Hardware-specific library
 #include <SPI.h>
-#include "URTouch.h" // Библиотека для работы с сенсорным экраном
+#include <URTouch.h> // Библиотека для работы с сенсорным экраном
 
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
@@ -141,25 +144,31 @@ void setup()
   tft.fillScreen(TFT_GREY);
   ts.InitTouch();                // Инициализируем сенсорный модуль дисплея
   ts.setPrecision(PREC_EXTREME); // Определяем необходимую точность обработки нажатий: PREC_LOW - низкая, PREC_MEDIUM - средняя, PREC_HI - высокая, PREC_EXTREME - максимальная
-
-  /* Initialise the sensor 2561*/
+Serial.begin(115200);
+  // Initialise the sensor 2561
   //use tsl.begin() to default to Wire,
   //tsl.begin(&Wire2) directs api to use Wire2, etc.
    if (!tsl.begin())   {
     // There was a problem detecting the TSL2561 ... check your connections 
     Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
-    while (1)
-      ;
+    while (1) {}
+      
   }
+configureSensor();
+tsl.enableAutoRange(true); // Auto-gain ... switches automatically between 1x and 16x 
+   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); // fast but low resolution 
+   
 
-  /* Display some basic information on this sensor */
-  //displaySensorDetails();
+  // Display some basic information on this sensor 
+//  displaySensorDetails();
+
+  
   pinMode(PIN_DHT, INPUT_PULLUP);
-  /* Setup the sensor gain and integration time */
-  //configureSensor();
-  /* while (!Serial1)  {   }
-  pzem = new PZEM004T(&Serial1);
-  pzem->setAddress(ip); */
+  // Setup the sensor gain and integration time 
+  
+  // while (!Serial1)  {   }
+  //pzem = new PZEM004T(&Serial1);
+  //pzem->setAddress(ip); 
   pinMode(PIN_RESET_PZEM, INPUT_PULLUP);
   pinMode(PIN_FLOOD, INPUT_PULLUP);
  
@@ -181,7 +190,7 @@ void loop() {
   // Get a new sensor 2561 event 
   sensors_event_t event;
   tsl.getEvent(&event);
-
+//displaySensorDetails();
   // Display the results (light is measured in lux) 
   if (event.light)   {
     Serial.print(event.light);
@@ -305,11 +314,29 @@ float dataPHMeter(void) { //
   return pHValue = 3.5 * voltage + Offset;                  // Преобразуем мВ в pH
 } //
 
-/*
-    Displays some basic information on this sensor from the unified
-    sensor API sensor_t type (see Adafruit_Sensor for more information)
-*/
-/**************************************************************************/
+
+
+void configureSensor(void)
+{
+  // You can also manually set the gain or enable auto-gain support 
+   //tsl.setGain(TSL2561_GAIN_1X);      // No gain ... use in bright light to avoid sensor saturation 
+   //tsl.setGain(TSL2561_GAIN_16X);     // 16x gain ... use in low light to boost sensitivity 
+   tsl.enableAutoRange(true); // Auto-gain ... switches automatically between 1x and 16x 
+
+  // Changing the integration time gives you better sensor resolution (402ms = 16-bit data) 
+   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); // fast but low resolution 
+   //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  // medium resolution and speed   
+   //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  // 16-bit data but slowest conversions 
+
+  // Update these values depending on what you've set above! 
+  Serial.println("------------------------------------");
+  Serial.print("Gain:         ");
+  Serial.println("Auto");
+  Serial.print("Timing:       ");
+  Serial.println("13 ms");
+  Serial.println("------------------------------------");
+}
+
 void displaySensorDetails(void)
 {
   sensor_t sensor;
@@ -335,37 +362,7 @@ void displaySensorDetails(void)
   delay(500);
 }
 
-/**************************************************************************/
-/*
-    Configures the gain and integration time for the TSL2561
-*/
-/**************************************************************************/
-void configureSensor(void)
-{
-  /* You can also manually set the gain or enable auto-gain support */
-   tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
-   tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
-   tsl.enableAutoRange(true); /* Auto-gain ... switches automatically between 1x and 16x */
 
-  /* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
-   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); /* fast but low resolution */
-   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
-   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
-
-  /* Update these values depending on what you've set above! */
-  Serial.println("------------------------------------");
-  Serial.print("Gain:         ");
-  Serial.println("Auto");
-  Serial.print("Timing:       ");
-  Serial.println("13 ms");
-  Serial.println("------------------------------------");
-}
-
-/**************************************************************************/
-/*
-    Arduino setup function (automatically called at startup)
-*/
-/**************************************************************************/
 
 void test_work(void)
 {
