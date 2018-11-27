@@ -46,7 +46,7 @@
 
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
-#include <PZEM004T.h>
+//#include <PZEM004T.h>
 
 // Для управления очисткой экрана с помощью кнопки RESET на Arduino подключить вывод дисплея RESET через резистор к пину RESET на плате Arduino
 // Для Mega 2560 вывод дисплея RESET, если не подключен в пин RESET на Arduino, подключить в 3.3V (без резистора), либо в 5V (с резистором)
@@ -97,7 +97,7 @@ URTouch ts(t_SCK, t_CS, t_MOSI, t_MISO, t_IRQ); // Создаем объект �
    =======
    2013/JAN/31  - First version (KTOWN)
 */
-//Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 
 // подключение pH-метра
 #define SensorPHPin A0      // pH meter Analog output to Arduino Analog Input 0
@@ -107,8 +107,8 @@ URTouch ts(t_SCK, t_CS, t_MOSI, t_MISO, t_IRQ); // Создаем объект �
 #define ArrayLenth 40
 
 // подключение измерителя мощности PZEM
-PZEM004T *pzem; // (RX,TX) connect to TX,RX of PZEM
-IPAddress ip(192, 168, 2, 1);
+//PZEM004T *pzem; // (RX,TX) connect to TX,RX of PZEM
+//IPAddress ip(192, 168, 2, 1);
 
 #define PIN_RESET_PZEM 31 // Пин сброса счетчика PZEM
 #define PIN_FLOOD 32 // Пин датчика протечки
@@ -145,24 +145,24 @@ void setup()
   /* Initialise the sensor 2561*/
   //use tsl.begin() to default to Wire,
   //tsl.begin(&Wire2) directs api to use Wire2, etc.
- /*  if (!tsl.begin())   {
-    /* There was a problem detecting the TSL2561 ... check your connections 
+   if (!tsl.begin())   {
+    // There was a problem detecting the TSL2561 ... check your connections 
     Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
     while (1)
       ;
   }
-*/ 
+
   /* Display some basic information on this sensor */
   //displaySensorDetails();
   pinMode(PIN_DHT, INPUT_PULLUP);
   /* Setup the sensor gain and integration time */
   //configureSensor();
-  while (!Serial1)  {   }
+  /* while (!Serial1)  {   }
   pzem = new PZEM004T(&Serial1);
-  pzem->setAddress(ip);
+  pzem->setAddress(ip); */
   pinMode(PIN_RESET_PZEM, INPUT_PULLUP);
   pinMode(PIN_FLOOD, INPUT_PULLUP);
-
+ 
   // выходные пины
   pinMode(PIN_HEATER, OUTPUT);
   pinMode(PIN_LIGHT1, OUTPUT);
@@ -178,20 +178,20 @@ void setup()
 }
 
 void loop() {
-  /* Get a new sensor 2561 event 
+  // Get a new sensor 2561 event 
   sensors_event_t event;
   tsl.getEvent(&event);
 
-  /* Display the results (light is measured in lux) 
+  // Display the results (light is measured in lux) 
   if (event.light)   {
     Serial.print(event.light);
     Serial.println(" lux");
   }   else   {
-    /* If event.light = 0 lux the sensor is probably saturated
-       and no reliable data could be generated! 
+    // If event.light = 0 lux the sensor is probably saturated
+    //   and no reliable data could be generated! 
     Serial.println("Sensor overload");
   } 
-  */
+  
   // put your main code here, to run repeatedly:
 }
 
@@ -291,6 +291,7 @@ double averagearray(uint16_t *arr, uint8_t number)
   }                                      //
   return avg;                            // Возвращаем полученное среднее значение
 } //
+
 float dataPHMeter(void) { //
   static float pHValue, voltage;
   static uint16_t pHArray[ArrayLenth]; // Массив для определения среднего показания напряжения считанного с датчика
@@ -309,7 +310,7 @@ float dataPHMeter(void) { //
     sensor API sensor_t type (see Adafruit_Sensor for more information)
 */
 /**************************************************************************/
-/* void displaySensorDetails(void)
+void displaySensorDetails(void)
 {
   sensor_t sensor;
   tsl.getSensor(&sensor);
@@ -333,7 +334,7 @@ float dataPHMeter(void) { //
   Serial.println("");
   delay(500);
 }
- */
+
 /**************************************************************************/
 /*
     Configures the gain and integration time for the TSL2561
@@ -342,22 +343,22 @@ float dataPHMeter(void) { //
 void configureSensor(void)
 {
   /* You can also manually set the gain or enable auto-gain support */
-  // tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
-  // tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
- // tsl.enableAutoRange(true); /* Auto-gain ... switches automatically between 1x and 16x */
+   tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
+   tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
+   tsl.enableAutoRange(true); /* Auto-gain ... switches automatically between 1x and 16x */
 
   /* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
-  //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); /* fast but low resolution */
-  // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
-  // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
+   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); /* fast but low resolution */
+   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
 
   /* Update these values depending on what you've set above! */
-  //Serial.println("------------------------------------");
-  //Serial.print("Gain:         ");
-  //Serial.println("Auto");
-  //Serial.print("Timing:       ");
-  //Serial.println("13 ms");
-  //Serial.println("------------------------------------");
+  Serial.println("------------------------------------");
+  Serial.print("Gain:         ");
+  Serial.println("Auto");
+  Serial.print("Timing:       ");
+  Serial.println("13 ms");
+  Serial.println("------------------------------------");
 }
 
 /**************************************************************************/
