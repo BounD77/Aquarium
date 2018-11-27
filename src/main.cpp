@@ -39,10 +39,14 @@
 // Видеообзоры и уроки работы с ARDUINO на YouTube-канале IOMOIO: https://www.youtube.com/channel/UCmNXABaTjX_iKH28TTJpiqA
 
 #include <Arduino.h>
-
+#include <Wire.h>        // I2C
 #include <TFT_ILI9341.h> // Hardware-specific library
 #include <SPI.h>
 #include "URTouch.h" // Библиотека для работы с сенсорным экраном
+
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2561_U.h>
+
 // Для управления очисткой экрана с помощью кнопки RESET на Arduino подключить вывод дисплея RESET через резистор к пину RESET на плате Arduino
 // Для Mega 2560 вывод дисплея RESET, если не подключен в пин RESET на Arduino, подключить в 3.3V (без резистора), либо в 5V (с резистором)
 
@@ -55,6 +59,17 @@ TFT_ILI9341 tft = TFT_ILI9341(); // Invoke custom library
 #define t_IRQ 7                  // Пин подключения вывода дисплея T_IRQ
 
 URTouch ts(t_SCK, t_CS, t_MOSI, t_MISO, t_IRQ); // Создаем объект сенсорного модуля и сообщаем библиотеке распиновку для работы с ним
+// подключение термодатчика
+#define PIN_DHT 2 // пин термодатчика
+
+// подключение датчика освещенности  GY-2561  I2C
+
+// подключение pH-метра
+#define SensorPHPin A0      // pH meter Analog output to Arduino Analog Input 0
+#define Offset -1.81        // Компенсация смещения
+#define LED 13              // Номер вывода светодиода, который является индикатором нормальной работы скетча
+#define samplingInterval 20 // Интервал в мс между измерениями
+#define ArrayLenth 40
 
 void setup()
 {
@@ -74,6 +89,7 @@ void setup()
 
 void loop()
 {
+
   // put your main code here, to run repeatedly:
 }
 
@@ -129,3 +145,74 @@ String utf8rus(String source)
   }
   return target;
 }
+
+// функция возврата значения PH                                                                                              ////
+
+  //
+//  Функция определения среднего значения напряжения                                          // Эта функция возвращает среднее арифметическое значение данных массива arr без учёта одного максимального и одного минимального значения массива.
+double averagearray(uint16_t *arr, uint8_t number)
+{                  //
+  uint8_t i; // Объявляем переменные для цикла и экстремумов
+  uint16_t  max, min;
+  double avg;      // Объявляем переменную для вывода среднего значения
+  long amount = 0; // Определяем переменную для подсчёта среднего значения
+  if (number <= 0)
+  {
+    Serial.println("Error number for the array to avraging!/n");
+    return 0;
+  } // В массиве arr не может быть 0 и менее элементов
+  if (number < 5)
+  {
+    for (i = 0; i < number; i++)
+    {
+      amount += arr[i];
+    }
+    avg = amount / number;
+    return avg; // Если в массиве arr менее 5 элементов, то среднее значение является средним арифметическим значением
+  }
+  else
+  { // Если в массиве arr более 5 элементов, то среднее значение считаем иначе ...
+    if (arr[0] < arr[1])
+    {
+      min = arr[0];
+      max = arr[1];
+    } // Определяем минимальное и максимальное число из первых двух элементов массива
+    else
+    {
+      min = arr[1];
+      max = arr[0];
+    } // Определяем минимальное и максимальное число из первых двух элементов массива
+    for (i = 2; i < number; i++)
+    { // Проходим по остальным элементам массива
+      if (arr[i] < min)
+      {
+        amount += min;
+        min = arr[i];
+      } // Если значение очередного элемента меньше минимального,  то добавляем к значению amount предыдущее минимальное значение  и обновляем значение min
+      else if (arr[i] > max)
+      {
+        amount += max;
+        max = arr[i];
+      } // Если значение очередного элемента больше максимального, то добавляем к значению amount предыдущее максимальное значение и обновляем значение max
+      else
+      {
+        amount += arr[i];
+      }                                  // Если значение очередного элемента находится в пределах между min и max, то добавляем значение этого элемента к amount
+    }                                    //
+    avg = (double)amount / (number - 2); // Получаем среднее арифметическое значение (без учета значений первых двух элементов массива arr, т.к. они не добавлялись к amount)
+  }                                      //
+  return avg;                            // Возвращаем полученное среднее значение
+} //
+float dataPHMeter(void)
+{ //
+  static float pHValue, voltage;
+  static uint16_t pHArray[ArrayLenth]; // Массив для определения среднего показания напряжения считанного с датчика
+  static uint16_t pHArrayIndex = 0;
+  // Объявляем переменные для хранения значений напряжения и pH
+  //  Проводим измерения:                                                                       //
+  pHArray[pHArrayIndex++] = analogRead(SensorPHPin); // Читаем данные в очередной элемент массива pHArray
+  if (pHArrayIndex == ArrayLenth)
+    pHArrayIndex = 0;                                       // Если достигли последнего элемента массива pHArray, то сбрасываем номер текущего элемента этого массива в 0
+  voltage = averagearray(pHArray, ArrayLenth) * 5.0 / 1023; // Получаем среднее напряжение в мВ из массива напряжений pHArray
+  pHValue = 3.5 * voltage + Offset;                         // Преобразуем мВ в pH
+} //
