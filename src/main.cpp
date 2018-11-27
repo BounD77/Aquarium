@@ -1,5 +1,7 @@
-
-using namespace std;
+void test_work(void);
+void displaySensorDetails(void);
+void configureSensor(void);
+//using namespace std;
 
 /*
  An example analogue clock using a TFT LCD screen to show the time
@@ -49,7 +51,7 @@ using namespace std;
 
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
-//#include <PZEM004T.h>
+#include <PZEM004T.h>
 
 // Для управления очисткой экрана с помощью кнопки RESET на Arduino подключить вывод дисплея RESET через резистор к пину RESET на плате Arduino
 // Для Mega 2560 вывод дисплея RESET, если не подключен в пин RESET на Arduino, подключить в 3.3V (без резистора), либо в 5V (с резистором)
@@ -67,7 +69,6 @@ URTouch ts(t_SCK, t_CS, t_MOSI, t_MISO, t_IRQ); // Создаем объект �
 #define PIN_DHT 2 // пин термодатчика
 
 // подключение датчика освещенности  GY-2561  I2C
-
 /* This driver uses the Adafruit unified sensor library (Adafruit_Sensor),
    which provides a common 'type' for sensor data and some helper functions.
    
@@ -103,32 +104,29 @@ URTouch ts(t_SCK, t_CS, t_MOSI, t_MISO, t_IRQ); // Создаем объект �
 Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 
 // подключение pH-метра
-#define SensorPHPin A0      // pH meter Analog output to Arduino Analog Input 0
-#define Offset -1.81        // Компенсация смещения
+#define SensorPHPin A0 // pH meter Analog output to Arduino Analog Input 0
+#define Offset -1.81   // Компенсация смещения
 //#define LED 13              // Номер вывода светодиода, который является индикатором нормальной работы скетча
 #define samplingInterval 1000 // Интервал в мс между измерениями
 #define ArrayLenth 40
 
 // подключение измерителя мощности PZEM
-//PZEM004T *pzem; // (RX,TX) connect to TX,RX of PZEM
-//IPAddress ip(192, 168, 2, 1);
+PZEM004T *pzem; // (RX,TX) connect to TX,RX of PZEM
+IPAddress ip(192, 168, 2, 1);
 
 #define PIN_RESET_PZEM 31 // Пин сброса счетчика PZEM
-#define PIN_FLOOD 32 // Пин датчика протечки
-#define PIN_PRESSURE 39 // давление CO2
+#define PIN_FLOOD 32      // Пин датчика протечки
+#define PIN_PRESSURE 39   // давление CO2
 
 // выходные пины
 #define PIN_HEATER 33 // нагреватель
 #define PIN_LIGHT1 34 // свет 1
 #define PIN_LIGHT2 35 // свет 2
 #define PIN_LIGHT3 36 // свет 3
-#define PIN_O2     37 // воздушный компрессор
-#define PIN_CO2    38 // реле  CO2
+#define PIN_O2 37     // воздушный компрессор
+#define PIN_CO2 38    // реле  CO2
 #define PIN_FILTER 40 // фильтр
-#define PIN_UF 41 // ультрафиолетовый светильник
-
-
-
+#define PIN_UF 41     // ультрафиолетовый светильник
 
 void setup()
 {
@@ -144,34 +142,34 @@ void setup()
   tft.fillScreen(TFT_GREY);
   ts.InitTouch();                // Инициализируем сенсорный модуль дисплея
   ts.setPrecision(PREC_EXTREME); // Определяем необходимую точность обработки нажатий: PREC_LOW - низкая, PREC_MEDIUM - средняя, PREC_HI - высокая, PREC_EXTREME - максимальная
-Serial.begin(115200);
+  Serial.begin(115200);
   // Initialise the sensor 2561
   //use tsl.begin() to default to Wire,
   //tsl.begin(&Wire2) directs api to use Wire2, etc.
-   if (!tsl.begin())   {
-    // There was a problem detecting the TSL2561 ... check your connections 
+  if (!tsl.begin())
+  {
+    // There was a problem detecting the TSL2561 ... check your connections
     Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
-    while (1) {}
-      
+    while (1)
+    {
+    }
   }
-configureSensor();
-tsl.enableAutoRange(true); // Auto-gain ... switches automatically between 1x and 16x 
-   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); // fast but low resolution 
-   
+  configureSensor();
+///  tsl.enableAutoRange(true);                            // Auto-gain ... switches automatically between 1x and 16x
+ // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); // fast but low resolution
 
-  // Display some basic information on this sensor 
-//  displaySensorDetails();
+  // Display some basic information on this sensor
+   displaySensorDetails();
 
-  
   pinMode(PIN_DHT, INPUT_PULLUP);
-  // Setup the sensor gain and integration time 
-  
+  // Setup the sensor gain and integration time
+
   // while (!Serial1)  {   }
   //pzem = new PZEM004T(&Serial1);
-  //pzem->setAddress(ip); 
+  //pzem->setAddress(ip);
   pinMode(PIN_RESET_PZEM, INPUT_PULLUP);
   pinMode(PIN_FLOOD, INPUT_PULLUP);
- 
+
   // выходные пины
   pinMode(PIN_HEATER, OUTPUT);
   pinMode(PIN_LIGHT1, OUTPUT);
@@ -182,29 +180,33 @@ tsl.enableAutoRange(true); // Auto-gain ... switches automatically between 1x an
   pinMode(PIN_FILTER, OUTPUT);
   pinMode(PIN_UF, OUTPUT);
 
-  
-//test_work(); // проверка работоспособности нагрузок путем поочередного включения и измерения силы тока
+  test_work(); // проверка работоспособности нагрузок путем поочередного включения и измерения силы тока
 }
 
-void loop() {
-  // Get a new sensor 2561 event 
+void loop()
+{
+  // Get a new sensor 2561 event
   sensors_event_t event;
   tsl.getEvent(&event);
-//displaySensorDetails();
-  // Display the results (light is measured in lux) 
-  if (event.light)   {
+  //displaySensorDetails();
+  // Display the results (light is measured in lux)
+  if (event.light)
+  {
     Serial.print(event.light);
     Serial.println(" lux");
-  }   else   {
+  }
+  else
+  {
     // If event.light = 0 lux the sensor is probably saturated
-    //   and no reliable data could be generated! 
+    //   and no reliable data could be generated!
     Serial.println("Sensor overload");
-  } 
-  
+  }
+
   // put your main code here, to run repeatedly:
 }
 
-String utf8rus(String source) {
+String utf8rus(String source)
+{
   int i, k;
   String target;
   unsigned char n;
@@ -213,16 +215,21 @@ String utf8rus(String source) {
   k = source.length();
   i = 0;
 
-  while (i < k)   {
+  while (i < k)
+  {
     n = source[i];
     i++;
 
-    if (n >= 0xC0)     {
-      switch (n)       {
-      case 0xD0:       {
+    if (n >= 0xC0)
+    {
+      switch (n)
+      {
+      case 0xD0:
+      {
         n = source[i];
         i++;
-        if (n == 0x81) {
+        if (n == 0x81)
+        {
           n = 0xA8;
           break;
         }
@@ -230,10 +237,12 @@ String utf8rus(String source) {
           n = n + 0x30;
         break;
       }
-      case 0xD1:       {
+      case 0xD1:
+      {
         n = source[i];
         i++;
-        if (n == 0x91)         {
+        if (n == 0x91)
+        {
           n = 0xB8;
           break;
         }
@@ -275,24 +284,30 @@ double averagearray(uint16_t *arr, uint8_t number)
   }
   else
   { // Если в массиве arr более 5 элементов, то среднее значение считаем иначе ...
-    if (arr[0] < arr[1])    {
+    if (arr[0] < arr[1])
+    {
       min = arr[0];
       max = arr[1];
     } // Определяем минимальное и максимальное число из первых двух элементов массива
-    else  {
+    else
+    {
       min = arr[1];
       max = arr[0];
     } // Определяем минимальное и максимальное число из первых двух элементов массива
-    for (i = 2; i < number; i++)     { // Проходим по остальным элементам массива
-      if (arr[i] < min)       {
+    for (i = 2; i < number; i++)
+    { // Проходим по остальным элементам массива
+      if (arr[i] < min)
+      {
         amount += min;
         min = arr[i];
       } // Если значение очередного элемента меньше минимального,  то добавляем к значению amount предыдущее минимальное значение  и обновляем значение min
-      else if (arr[i] > max)       {
+      else if (arr[i] > max)
+      {
         amount += max;
         max = arr[i];
       } // Если значение очередного элемента больше максимального, то добавляем к значению amount предыдущее максимальное значение и обновляем значение max
-      else       {
+      else
+      {
         amount += arr[i];
       }                                  // Если значение очередного элемента находится в пределах между min и max, то добавляем значение этого элемента к amount
     }                                    //
@@ -301,7 +316,8 @@ double averagearray(uint16_t *arr, uint8_t number)
   return avg;                            // Возвращаем полученное среднее значение
 } //
 
-float dataPHMeter(void) { //
+float dataPHMeter(void)
+{ //
   static float pHValue, voltage;
   static uint16_t pHArray[ArrayLenth]; // Массив для определения среднего показания напряжения считанного с датчика
   static uint16_t pHArrayIndex = 0;
@@ -314,21 +330,19 @@ float dataPHMeter(void) { //
   return pHValue = 3.5 * voltage + Offset;                  // Преобразуем мВ в pH
 } //
 
-
-
 void configureSensor(void)
 {
-  // You can also manually set the gain or enable auto-gain support 
-   //tsl.setGain(TSL2561_GAIN_1X);      // No gain ... use in bright light to avoid sensor saturation 
-   //tsl.setGain(TSL2561_GAIN_16X);     // 16x gain ... use in low light to boost sensitivity 
-   tsl.enableAutoRange(true); // Auto-gain ... switches automatically between 1x and 16x 
+  // You can also manually set the gain or enable auto-gain support
+  //tsl.setGain(TSL2561_GAIN_1X);      // No gain ... use in bright light to avoid sensor saturation
+  //tsl.setGain(TSL2561_GAIN_16X);     // 16x gain ... use in low light to boost sensitivity
+  tsl.enableAutoRange(true); // Auto-gain ... switches automatically between 1x and 16x
 
-  // Changing the integration time gives you better sensor resolution (402ms = 16-bit data) 
-   tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); // fast but low resolution 
-   //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  // medium resolution and speed   
-   //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  // 16-bit data but slowest conversions 
+  // Changing the integration time gives you better sensor resolution (402ms = 16-bit data)
+  tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS); // fast but low resolution
+                                                        //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  // medium resolution and speed
+                                                        //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  // 16-bit data but slowest conversions
 
-  // Update these values depending on what you've set above! 
+  // Update these values depending on what you've set above!
   Serial.println("------------------------------------");
   Serial.print("Gain:         ");
   Serial.println("Auto");
@@ -362,9 +376,6 @@ void displaySensorDetails(void)
   delay(500);
 }
 
-
-
 void test_work(void)
 {
-
 }
