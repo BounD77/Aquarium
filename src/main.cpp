@@ -1,6 +1,4 @@
-void test_work(void);
-void displaySensorDetails(void);
-void configureSensor(void);
+
 //using namespace std;
 
 /*
@@ -52,6 +50,20 @@ void configureSensor(void);
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
 #include <PZEM004T.h>
+#include <MemoryFree.h>
+#include <EEPROM.h>
+#include <Time.h> 
+// #include <TimeLib.h>
+
+#include <WiFiEsp.h>
+#include <WiFiEspUdp.h>
+
+// прототипы - перенести потом в .h
+void test_work(void);
+void displaySensorDetails(void);
+void configureSensor(void);
+time_t getNTPTime(void);
+
 
 // Для управления очисткой экрана с помощью кнопки RESET на Arduino подключить вывод дисплея RESET через резистор к пину RESET на плате Arduino
 // Для Mega 2560 вывод дисплея RESET, если не подключен в пин RESET на Arduino, подключить в 3.3V (без резистора), либо в 5V (с резистором)
@@ -128,6 +140,23 @@ IPAddress ip(192, 168, 2, 1);
 #define PIN_FILTER 40 // фильтр
 #define PIN_UF 41     // ультрафиолетовый светильник
 
+// перемееные и контанты для связи с ESP и работе NTP
+#define SYNCNTPINTERVAL 60*60  //количество секунд для синхронизации времени
+char ssid[] = "pfs";            // your network SSID (name)
+char pass[] = "<finservice-2000!>";        // your network password
+int status = WL_IDLE_STATUS;     // the Wifi radio's status
+char timeServer[] = "time.nist.gov";  // NTP server
+unsigned int localPort = 2390;        // local port to listen for UDP packets
+const int NTP_PACKET_SIZE = 48;  // NTP timestamp is in the first 48 bytes of the message
+const int UDP_TIMEOUT = 2000;    // timeout in miliseconds to wait for an UDP packet to arrive
+const int timeZone = 3;     // Central European Time
+byte packetBuffer[NTP_PACKET_SIZE]; // buffer to hold incoming and outgoing packets
+
+// A UDP instance to let us send and receive packets over UDP
+WiFiEspUDP Udp;
+//time_t currentTime;
+time_t prevDisplay = 0; // when the digital clock was displayed
+
 void setup()
 {
   // put your setup code here, to run once:
@@ -143,16 +172,42 @@ void setup()
   ts.InitTouch();                // Инициализируем сенсорный модуль дисплея
   ts.setPrecision(PREC_EXTREME); // Определяем необходимую точность обработки нажатий: PREC_LOW - низкая, PREC_MEDIUM - средняя, PREC_HI - высокая, PREC_EXTREME - максимальная
   Serial.begin(115200);
+
+  Serial3.begin(115200); // связь с ESP8266
+//currentTime = now();
+// initialize ESP module
+  WiFi.init(&Serial3);
+ // check for the presence of the shield
+  if (WiFi.status() == WL_NO_SHIELD) {
+    Serial.println(F("WiFi shield not present"));
+    // don't continue ???
+    //while (true);
+  }
+    // attempt to connect to WiFi network
+  while ( status != WL_CONNECTED) {
+    //delay(500);
+    Serial.print(F("Attempting to connect to WPA SSID: "));
+    Serial.println(ssid);
+    // Connect to WPA/WPA2 network
+    status = WiFi.begin(ssid, pass);
+  }
+  // you're connected now, so print out the data
+  Serial.println(F("You're connected to the network"));
+    Udp.begin(localPort);
+//Serial.print("Local port: ");
+time_t currTime = getNTPTime();
+  Serial.println(currTime);
+  // Serial.println("waiting for sync");
+  //setSyncProvider(getNTPTime);
+  //setSyncInterval(SYNCNTPINTERVAL);
   // Initialise the sensor 2561
   //use tsl.begin() to default to Wire,
   //tsl.begin(&Wire2) directs api to use Wire2, etc.
   if (!tsl.begin())
   {
     // There was a problem detecting the TSL2561 ... check your connections
-    Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
-    while (1)
-    {
-    }
+    Serial.print(F("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!"));
+   
   }
   configureSensor();
 ///  tsl.enableAutoRange(true);                            // Auto-gain ... switches automatically between 1x and 16x
@@ -180,6 +235,16 @@ void setup()
   pinMode(PIN_FILTER, OUTPUT);
   pinMode(PIN_UF, OUTPUT);
 
+
+  digitalWrite(PIN_HEATER, LOW);
+  digitalWrite(PIN_LIGHT1, LOW);
+  digitalWrite(PIN_LIGHT2, LOW);
+  digitalWrite(PIN_LIGHT3, LOW);
+  digitalWrite(PIN_O2, LOW);  
+  digitalWrite(PIN_CO2, LOW);
+  digitalWrite(PIN_FILTER, LOW);
+  digitalWrite(PIN_UF, LOW);
+
   test_work(); // проверка работоспособности нагрузок путем поочередного включения и измерения силы тока
 }
 
@@ -193,16 +258,26 @@ void loop()
   if (event.light)
   {
     Serial.print(event.light);
-    Serial.println(" lux");
+    Serial.println(F(" lux"));
   }
   else
   {
     // If event.light = 0 lux the sensor is probably saturated
     //   and no reliable data could be generated!
-    Serial.println("Sensor overload");
+    Serial.println(F("Sensor overload"));
+  }
+// обновляем и синхронизируем время
+if (timeStatus() != timeNotSet) {
+    if (now() != prevDisplay) { //update the display only if time has changed
+      prevDisplay = now();
+      Serial.println(prevDisplay);
+      // digitalClockDisplay();
+    }
   }
 
-  // put your main code here, to run repeatedly:
+//getNTPtime();
+//currentTime = now();
+// put your main code here, to run repeatedly:
 }
 
 String utf8rus(String source)
@@ -270,7 +345,7 @@ double averagearray(uint16_t *arr, uint8_t number)
   long amount = 0; // Определяем переменную для подсчёта среднего значения
   if (number <= 0)
   {
-    Serial.println("Error number for the array to avraging!/n");
+    Serial.println(F("Error number for the array to avraging!/n"));
     return 0;
   } // В массиве arr не может быть 0 и менее элементов
   if (number < 5)
@@ -343,37 +418,126 @@ void configureSensor(void)
                                                         //tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  // 16-bit data but slowest conversions
 
   // Update these values depending on what you've set above!
-  Serial.println("------------------------------------");
-  Serial.print("Gain:         ");
-  Serial.println("Auto");
-  Serial.print("Timing:       ");
-  Serial.println("13 ms");
-  Serial.println("------------------------------------");
+  Serial.println(F("------------------------------------"));
+  Serial.print(F("Gain:         "));
+  Serial.println(F("Auto"));
+  Serial.print(F("Timing:       "));
+  Serial.println(F("13 ms"));
+  Serial.println(F("------------------------------------"));
 }
 
 void displaySensorDetails(void)
 {
   sensor_t sensor;
   tsl.getSensor(&sensor);
-  Serial.println("------------------------------------");
-  Serial.print("Sensor:       ");
+  Serial.println(F("------------------------------------"));
+  Serial.print(F("Sensor:       "));
   Serial.println(sensor.name);
-  Serial.print("Driver Ver:   ");
+  Serial.print(F("Driver Ver:   "));
   Serial.println(sensor.version);
-  Serial.print("Unique ID:    ");
+  Serial.print(F("Unique ID:    "));
   Serial.println(sensor.sensor_id);
-  Serial.print("Max Value:    ");
+  Serial.print(F("Max Value:    "));
   Serial.print(sensor.max_value);
-  Serial.println(" lux");
-  Serial.print("Min Value:    ");
+  Serial.println(F(" lux"));
+  Serial.print(F("Min Value:    "));
   Serial.print(sensor.min_value);
-  Serial.println(" lux");
-  Serial.print("Resolution:   ");
+  Serial.println(F(" lux"));
+  Serial.print(F("Resolution:   "));
   Serial.print(sensor.resolution);
-  Serial.println(" lux");
-  Serial.println("------------------------------------");
+  Serial.println(F(" lux"));
+  Serial.println(F("------------------------------------"));
   Serial.println("");
   delay(500);
+}
+
+
+// send an NTP request to the time server at the given address
+void sendNTPpacket(char *ntpSrv)
+{
+  // set all bytes in the buffer to 0
+  memset(packetBuffer, 0, NTP_PACKET_SIZE);
+  // Initialize values needed to form NTP request
+  // (see URL above for details on the packets)
+
+  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
+  packetBuffer[1] = 0;     // Stratum, or type of clock
+  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[3] = 0xEC;  // Peer Clock Precision
+  // 8 bytes of zero for Root Delay & Root Dispersion
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+
+  // all NTP fields have been given values, now
+  // you can send a packet requesting a timestamp:
+  Udp.beginPacket(ntpSrv, 123); //NTP requests are to port 123
+
+  Udp.write(packetBuffer, NTP_PACKET_SIZE);
+
+  Udp.endPacket();
+}
+/* time_t getNtpTime()
+{
+  IPAddress ntpServerIP; // NTP server's ip address
+
+  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  Serial.println("Transmit NTP Request");
+  // get a random server from the pool
+  WiFi.hostByName(ntpServerName, ntpServerIP);
+  Serial.print(ntpServerName);
+  Serial.print(": ");
+  Serial.println(ntpServerIP);
+  sendNTPpacket(ntpServerIP);
+  uint32_t beginWait = millis();
+  while (millis() - beginWait < 1500) {
+    int size = Udp.parsePacket();
+    if (size >= NTP_PACKET_SIZE) {
+      Serial.println("Receive NTP Response");
+      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      unsigned long secsSince1900;
+      // convert four bytes starting at location 40 to a long integer
+      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+      secsSince1900 |= (unsigned long)packetBuffer[43];
+      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
+    }
+  }
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
+}
+ */
+time_t getNTPTime(void) {
+ sendNTPpacket(timeServer); // send an NTP packet to a time server
+  
+  // wait for a reply for UDP_TIMEOUT miliseconds
+  unsigned long startMs = millis();
+  while (!Udp.available() && (millis() - startMs) < UDP_TIMEOUT) {}
+
+  Serial.println(Udp.parsePacket());
+  if (Udp.parsePacket()) {
+    Serial.println("packet received");
+    // We've received a packet, read the data from it into the buffer
+    Udp.read(packetBuffer, NTP_PACKET_SIZE);
+
+    // the timestamp starts at byte 40 of the received packet and is four bytes,
+    // or two words, long. First, esxtract the two words:
+
+    unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
+    unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
+    // combine the four bytes (two words) into a long integer
+    // this is NTP time (seconds since Jan 1 1900):
+    unsigned long secsSince1900 = highWord << 16 | lowWord;
+    Serial.print(F("Seconds since Jan 1 1900 = "));
+    Serial.println(secsSince1900);
+    return secsSince1900  - 2208988800UL + timeZone * SECS_PER_HOUR;
+
+  }
+  
+  Serial.println("No NTP Response :-(");
+  return 0; // return 0 if unable to get the time
 }
 
 void test_work(void)
